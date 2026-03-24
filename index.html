@@ -163,33 +163,111 @@
     }
 
     /* ── Day strip ── */
-    .day-strip {
+    .date-nav {
+      width: min(1200px, calc(100vw - 3.5rem));
       display: flex;
-      justify-content: center;
-      gap: 0.2rem;
+      flex-direction: column;
+      gap: 0.55rem;
       opacity: 0;
       animation: fadeIn 0.8s ease 0.65s forwards;
     }
 
+    .date-nav-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      min-height: 1.5rem;
+    }
+
+    .selected-date {
+      font-size: 0.7rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #c4c8d8;
+    }
+
+    .today-jump {
+      border: 1px solid rgba(201,169,110,0.18);
+      background: rgba(201,169,110,0.08);
+      color: #d7b47a;
+      border-radius: 999px;
+      width: 8.5rem;
+      padding: 0.38rem 0.8rem;
+      font-size: 0.62rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: opacity 0.25s ease, transform 0.25s ease, background 0.25s ease;
+    }
+
+    .today-jump.is-hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateY(4px);
+    }
+
+    .today-jump:hover {
+      background: rgba(201,169,110,0.14);
+    }
+
+    .day-strip {
+      display: flex;
+      gap: 0.35rem;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-behavior: auto;
+      padding: 0.1rem 0.2rem 0.35rem;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .day-strip::-webkit-scrollbar { display: none; }
+
     .day-strip .day {
+      flex: 0 0 auto;
+      width: 4.5rem;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 0.15rem;
-      padding: 0.3rem 0.3rem;
-      border-radius: 6px;
-      min-width: 2.2rem;
-      cursor: default;
-      transition: background 0.2s;
+      gap: 0.2rem;
+      padding: 0.45rem 0.3rem;
+      border-radius: 12px;
+      border: 1px solid transparent;
+      background: rgba(255,255,255,0.018);
+      cursor: pointer;
+      transition: background 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
     }
-    .day-strip .day:hover { background: rgba(255,255,255,0.03); }
+
+    .day-strip .day:hover {
+      background: rgba(255,255,255,0.04);
+      transform: translateY(-1px);
+    }
+
     .day-strip .day.today {
-      background: rgba(201,169,110,0.08);
-      border: 1px solid rgba(201,169,110,0.12);
+      border-color: rgba(201,169,110,0.12);
     }
-    .day-strip .day-icon { font-size: 0.95rem; line-height: 1; }
-    .day-strip .day-label { font-size: 0.5rem; color: #4a4a58; font-weight: 500; }
-    .day-strip .day.today .day-label { color: #c9a96e; }
+
+    .day-strip .day.selected {
+      background: rgba(201,169,110,0.09);
+      border-color: rgba(201,169,110,0.22);
+      box-shadow: inset 0 0 0 1px rgba(201,169,110,0.08);
+    }
+
+    .day-strip .day-icon { font-size: 1rem; line-height: 1; }
+    .day-strip .day-label,
+    .day-strip .day-date {
+      font-size: 0.55rem;
+      color: #6d7186;
+      font-weight: 500;
+      line-height: 1;
+    }
+
+    .day-strip .day.selected .day-label,
+    .day-strip .day.selected .day-date {
+      color: #d7b47a;
+    }
 
     /* ── Bottom: upcoming phases ── */
     .upcoming {
@@ -226,7 +304,17 @@
       border: 1px solid rgba(255,255,255,0.03);
       transition: background 0.3s;
     }
-    .phase-card:hover { background: rgba(255,255,255,0.035); }
+    .phase-card:hover {
+      background: rgba(255,255,255,0.035);
+    }
+    .phase-card.selected {
+      background: rgba(201,169,110,0.09);
+      border-color: rgba(201,169,110,0.18);
+    }
+    .phase-card.selected .phase-card-name,
+    .phase-card.selected .phase-card-date {
+      color: #d7b47a;
+    }
     .phase-card .phase-icon { font-size: 1.3rem; line-height: 1; }
     .phase-card .phase-card-name { font-size: 0.6rem; font-weight: 500; color: #8a8a9a; text-align: center; }
     .phase-card .phase-card-date { font-size: 0.6rem; color: #c9a96e; font-weight: 500; }
@@ -275,7 +363,13 @@
         <canvas id="moonCanvas" width="1536" height="1536"></canvas>
       </div>
 
-      <div class="day-strip" id="dayStrip"></div>
+      <div class="date-nav">
+        <div class="date-nav-meta">
+          <div class="selected-date" id="selectedDateLabel">...</div>
+          <button class="today-jump is-hidden" id="todayJump">Jump To Today</button>
+        </div>
+        <div class="day-strip" id="dayStrip"></div>
+      </div>
 
       <div class="moon-info">
         <div class="info-item">
@@ -324,6 +418,23 @@
 
     const MOON_TEXTURE_SRC = 'assets/moon-texture-2048.jpg';
     const MOON_TEXTURE_CROP = 0.74;
+    const DAY_WINDOW = 161;
+    const DAY_SHIFT_CHUNK = 48;
+
+    const appState = {
+      loc: null,
+      timeZone: null,
+      textureImg: null,
+      todayDate: null,
+      selectedDate: null,
+      stripCenterDate: null,
+      stripStartDate: null,
+      moonAnimationId: 0,
+      currentScene: null,
+      animatedPhase: null,
+      animatedFraction: null,
+      stripDragging: false,
+    };
 
     function loadMoonTexture() {
       return new Promise((resolve) => {
@@ -418,7 +529,6 @@
         drawTextureLayer(ctx, textureImg, size, 0.78, 1.52, 0.42);
         ctx.globalCompositeOperation = 'source-over';
         addTextureRelief(ctx, size, r);
-        drawTerminatorRelief(ctx, size, r, terminatorRx, waxing);
 
         const litBloom = ctx.createRadialGradient(r * lightBias, r * 0.46, r * 0.06, r, r, r);
         litBloom.addColorStop(0, 'rgba(255,250,238,0.08)');
@@ -428,50 +538,6 @@
         ctx.fillRect(0, 0, size, size);
         ctx.restore();
       }
-    }
-
-    function drawTerminatorRelief(ctx, size, r, terminatorRx, waxing) {
-      const noise = mulberry32(113);
-      ctx.save();
-      ctx.lineCap = 'round';
-
-      for (let y = r * 0.08; y < size - r * 0.08; y += Math.max(2, r * 0.008)) {
-        const dy = (y - r) / r;
-        const span = Math.sqrt(Math.max(0, 1 - dy * dy));
-        if (!span) continue;
-
-        const baseX = r + (waxing ? 1 : -1) * terminatorRx * span;
-        const jitter = (noise() - 0.5) * r * 0.018;
-        const width = (0.5 + noise()) * r * 0.022;
-
-        ctx.strokeStyle = `rgba(8,10,16,${0.18 + noise() * 0.12})`;
-        ctx.lineWidth = Math.max(1, r * 0.006);
-        ctx.beginPath();
-        if (waxing) {
-          ctx.moveTo(baseX - width + jitter, y);
-          ctx.lineTo(baseX + jitter, y);
-        } else {
-          ctx.moveTo(baseX + jitter, y);
-          ctx.lineTo(baseX + width + jitter, y);
-        }
-        ctx.stroke();
-
-        if (noise() > 0.42) {
-          ctx.strokeStyle = `rgba(220,224,232,${0.04 + noise() * 0.05})`;
-          ctx.lineWidth = Math.max(0.5, r * 0.0025);
-          ctx.beginPath();
-          if (waxing) {
-            ctx.moveTo(baseX + jitter, y);
-            ctx.lineTo(baseX + jitter + r * 0.008, y);
-          } else {
-            ctx.moveTo(baseX + jitter - r * 0.008, y);
-            ctx.lineTo(baseX + jitter, y);
-          }
-          ctx.stroke();
-        }
-      }
-
-      ctx.restore();
     }
 
     function addTextureRelief(ctx, size, r) {
@@ -880,6 +946,93 @@
       }).format(date);
     }
 
+    function formatLongDate(date, timeZone) {
+      return new Intl.DateTimeFormat([], {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+        timeZone: timeZone || undefined,
+      }).format(date);
+    }
+
+    function getDayDiff(a, b, timeZone) {
+      const pa = getTimeZoneDateParts(a, timeZone);
+      const pb = getTimeZoneDateParts(b, timeZone);
+      const ua = Date.UTC(Number(pa.year), Number(pa.month) - 1, Number(pa.day));
+      const ub = Date.UTC(Number(pb.year), Number(pb.month) - 1, Number(pb.day));
+      return Math.round((ua - ub) / 864e5);
+    }
+
+    function getSceneData(date) {
+      const illum = SunCalc.getMoonIllumination(date);
+      const moonrise = findMoonEvent(date, appState.loc.lat, appState.loc.lng, 'rise', appState.timeZone);
+      const moonset = findMoonEvent(date, appState.loc.lat, appState.loc.lng, 'set', appState.timeZone);
+      if (moonrise) Object.assign(moonrise, { timeZone: appState.timeZone, referenceDate: date });
+      if (moonset) Object.assign(moonset, { timeZone: appState.timeZone, referenceDate: date });
+      return { illum, moonrise, moonset };
+    }
+
+    function updateSelectedDateLabel(date) {
+      document.getElementById('selectedDateLabel').textContent = formatLongDate(date, appState.timeZone);
+      document.getElementById('todayJump').classList.toggle(
+        'is-hidden',
+        isSameTimeZoneDay(date, appState.todayDate, appState.timeZone)
+      );
+    }
+
+    function updateSceneText(date, scene) {
+      document.getElementById('phaseName').textContent = getPhaseInfo(scene.illum.phase).name;
+      document.getElementById('illumination').textContent = Math.round(scene.illum.fraction * 100) + '%';
+      document.getElementById('moonrise').textContent = formatMoonEvent(scene.moonrise);
+      document.getElementById('moonset').textContent = scene.moonset
+        ? formatNumericTime(scene.moonset.time, scene.moonset.timeZone)
+        : '--';
+      updateSelectedDateLabel(date);
+    }
+
+    function animateSceneTo(date, scene) {
+      const canvas = document.getElementById('moonCanvas');
+      const ctx = canvas.getContext('2d');
+      const previousScene = appState.currentScene || scene;
+      const fromCanvas = document.createElement('canvas');
+      const toCanvas = document.createElement('canvas');
+      fromCanvas.width = toCanvas.width = canvas.width;
+      fromCanvas.height = toCanvas.height = canvas.height;
+      drawMoon(fromCanvas, previousScene.illum.phase, previousScene.illum.fraction, appState.textureImg);
+      drawMoon(toCanvas, scene.illum.phase, scene.illum.fraction, appState.textureImg);
+      const startTime = performance.now();
+      const duration = 820;
+      const animationId = ++appState.moonAnimationId;
+
+      function frame(now) {
+        if (animationId !== appState.moonAnimationId) return;
+        const t = Math.min(1, (now - startTime) / duration);
+        const eased = t * t * (3 - 2 * t);
+        const glowPhase = previousScene.illum.phase + (scene.illum.phase - previousScene.illum.phase) * eased;
+        const glowFraction = previousScene.illum.fraction + (scene.illum.fraction - previousScene.illum.fraction) * eased;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.globalAlpha = 1 - eased;
+        ctx.drawImage(fromCanvas, 0, 0);
+        ctx.globalAlpha = eased;
+        ctx.drawImage(toCanvas, 0, 0);
+        ctx.globalAlpha = 1;
+
+        appState.animatedPhase = glowPhase;
+        appState.animatedFraction = glowFraction;
+        setPageGlow(glowPhase, glowFraction);
+
+        if (t < 1) {
+          requestAnimationFrame(frame);
+        } else {
+          appState.currentScene = scene;
+        }
+      }
+
+      requestAnimationFrame(frame);
+    }
+
     function findMoonEvent(date, lat, lng, eventName, timeZone) {
       for (let offset = 0; offset <= 3; offset++) {
         const targetDay = shiftTimeZoneDate(date, timeZone, offset);
@@ -910,6 +1063,36 @@
     }
 
     // ────────────────────── Upcoming phases ──────────────────────
+    function getDateKey(date, timeZone) {
+      const parts = getTimeZoneDateParts(date, timeZone);
+      return `${parts.year}-${parts.month}-${parts.day}`;
+    }
+
+    function findPhaseDateForward(target, startDate, maxDays = 60) {
+      for (let d = 0; d < maxDays; d++) {
+        const d1 = new Date(startDate.getTime() + d * 864e5);
+        const d2 = new Date(startDate.getTime() + (d + 1) * 864e5);
+        const p1 = SunCalc.getMoonIllumination(d1).phase;
+        const p2 = SunCalc.getMoonIllumination(d2).phase;
+        const crossed = target === 0 ? p2 < p1 : (p1 <= target && p2 > target);
+        if (!crossed) continue;
+
+        let lo = d1.getTime();
+        let hi = d2.getTime();
+        for (let i = 0; i < 16; i++) {
+          const mid = (lo + hi) / 2;
+          const pm = SunCalc.getMoonIllumination(new Date(mid)).phase;
+          if (target === 0) {
+            pm > 0.5 ? lo = mid : hi = mid;
+          } else {
+            pm < target ? lo = mid : hi = mid;
+          }
+        }
+        return new Date((lo + hi) / 2);
+      }
+      return startDate;
+    }
+
     function findUpcomingPhases(now) {
       const targets = [
         { name: 'New Moon', target: 0, icon: '\uD83C\uDF11' },
@@ -943,30 +1126,172 @@
     }
 
     function renderUpcoming(phases, timeZone) {
-      document.getElementById('phasesGrid').innerHTML = phases.map(p => {
+      const grid = document.getElementById('phasesGrid');
+      const fragment = document.createDocumentFragment();
+      const selectedKey = getDateKey(appState.selectedDate, appState.timeZone);
+
+      for (const p of phases) {
         const ds = formatShortDate(p.date, timeZone);
         const dl = p.daysAway === 0 ? 'Today' : p.daysAway === 1 ? 'Tomorrow' : `in ${p.daysAway} days`;
-        return `<div class="phase-card">
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'phase-card';
+        if (getDateKey(p.date, appState.timeZone) === selectedKey) card.classList.add('selected');
+        card.innerHTML = `
           <span class="phase-icon">${p.icon}</span>
           <span class="phase-card-name">${p.name}</span>
           <span class="phase-card-date">${ds}</span>
           <span class="phase-card-days">${dl}</span>
-        </div>`;
-      }).join('');
+        `;
+        card.addEventListener('click', () => {
+          selectDate(p.date);
+          ensureDateVisibleInStrip(p.date);
+        });
+        fragment.appendChild(card);
+      }
+
+      grid.replaceChildren(fragment);
     }
 
-    function renderDayStrip(now, timeZone) {
-      document.getElementById('dayStrip').innerHTML = Array.from({length: 7}, (_, i) => {
-        const d = i - 3;
-        const date = shiftTimeZoneDate(now, timeZone, d);
-        const ph = SunCalc.getMoonIllumination(date).phase;
-        const icon = getPhaseInfo(ph).icon;
-        const label = d === 0 ? 'Today' : formatWeekday(date, timeZone);
-        return `<div class="day ${d === 0 ? 'today' : ''}">
-          <span class="day-icon">${icon}</span>
-          <span class="day-label">${label}</span>
-        </div>`;
-      }).join('');
+    function createDayPill(date) {
+      const diffFromToday = getDayDiff(date, appState.todayDate, appState.timeZone);
+      const ph = SunCalc.getMoonIllumination(date).phase;
+      const icon = getPhaseInfo(ph).icon;
+      const label = diffFromToday === 0 ? 'Today' : formatWeekday(date, appState.timeZone);
+      const day = document.createElement('button');
+      day.type = 'button';
+      day.className = 'day';
+      day.dataset.offset = String(getDayDiff(date, appState.stripCenterDate, appState.timeZone));
+      day.dataset.dateKey = getDateKey(date, appState.timeZone);
+      day.innerHTML = `
+        <span class="day-icon">${icon}</span>
+        <span class="day-label">${label}</span>
+        <span class="day-date">${formatShortDate(date, appState.timeZone)}</span>
+      `;
+      if (diffFromToday === 0) day.classList.add('today');
+      if (isSameTimeZoneDay(date, appState.selectedDate, appState.timeZone)) day.classList.add('selected');
+      day.addEventListener('click', () => selectDate(date));
+      return day;
+    }
+
+    function updateDayStripSelection() {
+      const strip = document.getElementById('dayStrip');
+      const selectedKey = getDateKey(appState.selectedDate, appState.timeZone);
+      strip.querySelectorAll('.day').forEach((day) => {
+        day.classList.toggle('selected', day.dataset.dateKey === selectedKey);
+      });
+    }
+
+    function renderDayStrip(centerDate, preserveScroll = null) {
+      const strip = document.getElementById('dayStrip');
+      const fragment = document.createDocumentFragment();
+      appState.stripCenterDate = centerDate;
+
+      for (let i = -Math.floor(DAY_WINDOW / 2); i <= Math.floor(DAY_WINDOW / 2); i++) {
+        fragment.appendChild(createDayPill(shiftTimeZoneDate(centerDate, appState.timeZone, i)));
+      }
+
+      strip.replaceChildren(fragment);
+
+      if (preserveScroll !== null) {
+        strip.scrollLeft = preserveScroll;
+      } else {
+        requestAnimationFrame(() => {
+          const selected = strip.querySelector('.day.selected');
+          if (selected) {
+            strip.scrollLeft = selected.offsetLeft - (strip.clientWidth - selected.offsetWidth) / 2;
+          }
+        });
+      }
+    }
+
+    function maybeRecenterDayStrip() {
+      const strip = document.getElementById('dayStrip');
+      const threshold = strip.clientWidth * 0.5;
+      let shift = 0;
+
+      if (strip.scrollLeft < threshold) shift = -DAY_SHIFT_CHUNK;
+      else if (strip.scrollLeft > strip.scrollWidth - strip.clientWidth - threshold) shift = DAY_SHIFT_CHUNK;
+
+      if (!shift) return;
+
+      const nextCenter = shiftTimeZoneDate(appState.stripCenterDate, appState.timeZone, shift);
+      const averageItemWidth = strip.scrollWidth / DAY_WINDOW;
+      const nextScroll = strip.scrollLeft - shift * averageItemWidth;
+      renderDayStrip(nextCenter, nextScroll);
+      updateDayStripSelection();
+    }
+
+    function scrollToDateInStrip(targetDate, behavior = 'smooth', align = 'center') {
+      const strip = document.getElementById('dayStrip');
+      const key = getDateKey(targetDate, appState.timeZone);
+      let pill = strip.querySelector(`.day[data-date-key="${key}"]`);
+
+      if (!pill) {
+        renderDayStrip(targetDate);
+        pill = strip.querySelector(`.day[data-date-key="${key}"]`);
+      }
+
+      if (!pill) return;
+
+      const left = align === 'start'
+        ? pill.offsetLeft - 8
+        : pill.offsetLeft - (strip.clientWidth - pill.offsetWidth) / 2;
+
+      strip.scrollTo({ left, behavior });
+    }
+
+    function ensureDateVisibleInStrip(targetDate) {
+      const strip = document.getElementById('dayStrip');
+      const key = getDateKey(targetDate, appState.timeZone);
+      let pill = strip.querySelector(`.day[data-date-key="${key}"]`);
+      if (!pill) {
+        scrollToDateInStrip(targetDate, 'smooth', 'center');
+        return;
+      }
+
+      const left = pill.offsetLeft;
+      const right = left + pill.offsetWidth;
+      const viewLeft = strip.scrollLeft;
+      const viewRight = viewLeft + strip.clientWidth;
+
+      if (left < viewLeft + 8 || right > viewRight - 8) {
+        scrollToDateInStrip(targetDate, 'smooth', 'center');
+      }
+    }
+
+    function selectDate(date, animate = true) {
+      appState.selectedDate = date;
+      updateDayStripSelection();
+
+      const scene = getSceneData(date);
+      updateSceneText(date, scene);
+      renderUpcoming(findUpcomingPhases(date), appState.timeZone);
+
+      if (animate) animateSceneTo(date, scene);
+      else {
+        appState.animatedPhase = scene.illum.phase;
+        appState.animatedFraction = scene.illum.fraction;
+        drawMoon(document.getElementById('moonCanvas'), scene.illum.phase, scene.illum.fraction, appState.textureImg);
+        setPageGlow(scene.illum.phase, scene.illum.fraction);
+        appState.currentScene = scene;
+      }
+    }
+
+    function setupDateStripInteractions() {
+      const strip = document.getElementById('dayStrip');
+      const todayJump = document.getElementById('todayJump');
+
+      strip.addEventListener('scroll', () => {
+        maybeRecenterDayStrip();
+      }, { passive: true });
+
+      todayJump.addEventListener('click', () => {
+        appState.stripCenterDate = appState.todayDate;
+        renderDayStrip(appState.todayDate);
+        selectDate(appState.todayDate);
+        scrollToDateInStrip(appState.todayDate, 'smooth', 'center');
+      });
     }
 
     // ────────────────────── Geolocation ──────────────────────
@@ -1006,28 +1331,18 @@
         locEl.innerHTML = `${loc.city}, ${loc.region}<br>${loc.country}`;
       }
 
-      const now = new Date();
-      const illum = SunCalc.getMoonIllumination(now);
-      const moonrise = findMoonEvent(now, loc.lat, loc.lng, 'rise', timeZone);
-      const moonset = findMoonEvent(now, loc.lat, loc.lng, 'set', timeZone);
-      if (moonrise) Object.assign(moonrise, { timeZone, referenceDate: now });
-      if (moonset) Object.assign(moonset, { timeZone, referenceDate: now });
+      appState.loc = loc;
+      appState.timeZone = timeZone;
+      appState.textureImg = textureImg;
+      appState.todayDate = shiftTimeZoneDate(new Date(), timeZone, 0);
+      appState.selectedDate = appState.todayDate;
+      appState.stripCenterDate = appState.todayDate;
+      appState.stripStartDate = findPhaseDateForward(0, shiftTimeZoneDate(appState.todayDate, timeZone, -35));
 
-      // Draw moon
-      const canvas = document.getElementById('moonCanvas');
-      drawMoon(canvas, illum.phase, illum.fraction, textureImg);
-
-      // Glow
-      setPageGlow(illum.phase, illum.fraction);
-
-      // Text
-      document.getElementById('phaseName').textContent = getPhaseInfo(illum.phase).name;
-      document.getElementById('illumination').textContent = Math.round(illum.fraction * 100) + '%';
-      document.getElementById('moonrise').textContent = formatMoonEvent(moonrise);
-      document.getElementById('moonset').textContent = moonset ? formatNumericTime(moonset.time, moonset.timeZone) : '--';
-
-      renderDayStrip(now, timeZone);
-      renderUpcoming(findUpcomingPhases(now), timeZone);
+      setupDateStripInteractions();
+      renderDayStrip(appState.todayDate);
+      selectDate(appState.todayDate, false);
+      scrollToDateInStrip(appState.stripStartDate, 'auto', 'start');
     }
 
     init();
