@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#06060b">
+  <title>Moon</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌙</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/suncalc/1.9.0/suncalc.min.js"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: #06060b;
+      color: #8a8a9a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    /* ── Page-wide moonlight glow ── */
+    .page-glow {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0;
+      transition: opacity 2s ease;
+    }
+
+    /* ── Star field canvas ── */
+    .stars {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── Main layout ── */
+    .container {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      max-width: none;
+      height: 100vh;
+      padding: 1rem 1.75rem 1rem;
+    }
+
+    /* ── Header row ── */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      opacity: 0;
+      animation: fadeIn 1s ease 0.4s forwards;
+    }
+
+    .phase-name {
+      font-size: 0.85rem;
+      font-weight: 300;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #d4d4e4;
+    }
+
+    .location {
+      font-size: 0.65rem;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #4a4a5a;
+      text-align: right;
+    }
+
+    /* ── Moon ── */
+    .moon-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      width: 100vw;
+      min-height: 0;
+    }
+
+    .moon-wrap {
+      position: relative;
+      --moon-size: min(760px, 78vh, 96vw);
+      width: var(--moon-size);
+      height: var(--moon-size);
+      flex-shrink: 0;
+      opacity: 0;
+      animation: moonReveal 1.5s ease 0.15s forwards;
+    }
+
+    .moon-wrap canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: 50%;
+    }
+
+    /* Glow halo right behind the moon */
+    .moon-halo {
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 140%; height: 140%;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: -1;
+      opacity: 0;
+      transition: opacity 1.5s ease;
+    }
+
+    @keyframes moonReveal {
+      0% { opacity: 0; transform: scale(0.93); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    /* ── Info bar ── */
+    .moon-info {
+      display: flex;
+      gap: 2rem;
+      opacity: 0;
+      animation: fadeIn 0.8s ease 0.55s forwards;
+    }
+
+    .info-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.2rem;
+    }
+
+    .info-label {
+      font-size: 0.55rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #3a3a48;
+    }
+
+    .info-value {
+      font-weight: 500;
+      color: #8a8a9a;
+      font-size: 0.8rem;
+    }
+
+    /* ── Day strip ── */
+    .day-strip {
+      display: flex;
+      justify-content: center;
+      gap: 0.2rem;
+      opacity: 0;
+      animation: fadeIn 0.8s ease 0.65s forwards;
+    }
+
+    .day-strip .day {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.15rem;
+      padding: 0.3rem 0.3rem;
+      border-radius: 6px;
+      min-width: 2.2rem;
+      cursor: default;
+      transition: background 0.2s;
+    }
+    .day-strip .day:hover { background: rgba(255,255,255,0.03); }
+    .day-strip .day.today {
+      background: rgba(201,169,110,0.08);
+      border: 1px solid rgba(201,169,110,0.12);
+    }
+    .day-strip .day-icon { font-size: 0.95rem; line-height: 1; }
+    .day-strip .day-label { font-size: 0.5rem; color: #4a4a58; font-weight: 500; }
+    .day-strip .day.today .day-label { color: #c9a96e; }
+
+    /* ── Bottom: upcoming phases ── */
+    .upcoming {
+      width: min(1200px, calc(100vw - 3.5rem));
+      padding-bottom: 0.75rem;
+      opacity: 0;
+      animation: fadeIn 0.8s ease 0.75s forwards;
+    }
+
+    .upcoming-title {
+      font-size: 0.55rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #333340;
+      text-align: center;
+      margin-bottom: 0.6rem;
+    }
+
+    .phases-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.4rem;
+    }
+
+    .phase-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.6rem 0.3rem;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.012);
+      border: 1px solid rgba(255,255,255,0.03);
+      transition: background 0.3s;
+    }
+    .phase-card:hover { background: rgba(255,255,255,0.035); }
+    .phase-card .phase-icon { font-size: 1.3rem; line-height: 1; }
+    .phase-card .phase-card-name { font-size: 0.6rem; font-weight: 500; color: #8a8a9a; text-align: center; }
+    .phase-card .phase-card-date { font-size: 0.6rem; color: #c9a96e; font-weight: 500; }
+    .phase-card .phase-card-days { font-size: 0.52rem; color: #4a4a58; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      .phases-grid { grid-template-columns: repeat(4, 1fr); gap: 0.3rem; }
+      .moon-info { gap: 1.2rem; }
+      .container { padding: 0.8rem 1rem 0.8rem; }
+    }
+
+    @media (max-height: 700px) {
+      .moon-wrap { --moon-size: min(320px, 45vh, 70vw); }
+      .phase-card { padding: 0.4rem 0.2rem; gap: 0.2rem; }
+      .phase-card .phase-icon { font-size: 1rem; }
+    }
+
+    @media (min-height: 900px) {
+      .moon-wrap { --moon-size: min(480px, 55vh, 78vw); }
+    }
+
+    @media (min-height: 1050px) {
+      .moon-wrap { --moon-size: min(540px, 52vh, 78vw); }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-glow" id="pageGlow"></div>
+  <canvas class="stars" id="starsCanvas"></canvas>
+
+  <div class="container">
+    <div class="header">
+      <div class="phase-name" id="phaseName">...</div>
+      <div class="location" id="location"></div>
+    </div>
+
+    <div class="moon-section">
+      <div class="moon-wrap" id="moonWrap">
+        <div class="moon-halo" id="moonHalo"></div>
+        <canvas id="moonCanvas" width="1536" height="1536"></canvas>
+      </div>
+
+      <div class="day-strip" id="dayStrip"></div>
+
+      <div class="moon-info">
+        <div class="info-item">
+          <span class="info-label">Illumination</span>
+          <span class="info-value" id="illumination">--</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Moonrise</span>
+          <span class="info-value" id="moonrise">--</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Moonset</span>
+          <span class="info-value" id="moonset">--</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="upcoming">
+      <div class="upcoming-title">Upcoming Phases</div>
+      <div class="phases-grid" id="phasesGrid"></div>
+    </div>
+  </div>
+
+  <script>
+    // ────────────────────── Stars ──────────────────────
+    function drawStars() {
+      const c = document.getElementById('starsCanvas');
+      const ctx = c.getContext('2d');
+      const dpr = devicePixelRatio || 1;
+      c.width = window.innerWidth * dpr;
+      c.height = window.innerHeight * dpr;
+      ctx.scale(dpr, dpr);
+      const w = window.innerWidth, h = window.innerHeight;
+      const n = Math.floor((w * h) / 3000);
+      for (let i = 0; i < n; i++) {
+        const x = Math.random() * w, y = Math.random() * h;
+        const r = Math.random() * 1.1 + 0.2;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(210,215,240,${Math.random() * 0.45 + 0.08})`;
+        ctx.fill();
+      }
+    }
+    drawStars();
+    window.addEventListener('resize', drawStars);
+
+    const MOON_TEXTURE_SRC = 'assets/moon-texture-2048.jpg';
+    const MOON_TEXTURE_CROP = 0.74;
+
+    function loadMoonTexture() {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = MOON_TEXTURE_SRC;
+      });
+    }
+
+    // ────────────────────── Draw moon ──────────────────────
+    function drawMoon(canvas, phase, fraction, textureImg) {
+      const size = canvas.width;
+      const r = size / 2;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, size, size);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(r, r, r, 0, Math.PI * 2);
+      ctx.clip();
+
+      if (textureImg) {
+        drawTexturedMoon(ctx, textureImg, size, r, phase, fraction);
+      } else {
+        drawProceduralSurface(ctx, size, r);
+      }
+
+      // Phase shadow
+      applyPhaseShadow(ctx, size, r, phase);
+
+      ctx.restore();
+    }
+
+    function drawTextureLayer(ctx, textureImg, size, brightness, contrast, opacity = 1) {
+      const sourceSize = Math.min(textureImg.width, textureImg.height) * MOON_TEXTURE_CROP;
+      const sx = (textureImg.width - sourceSize) / 2;
+      const sy = (textureImg.height - sourceSize) / 2;
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      ctx.filter = `grayscale(0.08) contrast(${contrast}) brightness(${brightness})`;
+      ctx.drawImage(textureImg, sx, sy, sourceSize, sourceSize, 0, 0, size, size);
+      ctx.filter = 'none';
+      ctx.restore();
+    }
+
+    function traceLitRegion(ctx, r, fraction, waxing) {
+      if (fraction <= 0.001) return false;
+
+      ctx.beginPath();
+      if (fraction >= 0.999) {
+        ctx.arc(r, r, r, 0, Math.PI * 2);
+        return true;
+      }
+
+      const terminatorRx = Math.max(r * Math.abs(1 - 2 * fraction), r * 0.01);
+      const gibbous = fraction > 0.5;
+
+      if (waxing) {
+        ctx.arc(r, r, r, -Math.PI / 2, Math.PI / 2, false);
+        ctx.ellipse(r, r, terminatorRx, r, 0, Math.PI / 2, -Math.PI / 2, !gibbous);
+      } else {
+        ctx.arc(r, r, r, -Math.PI / 2, Math.PI / 2, true);
+        ctx.ellipse(r, r, terminatorRx, r, 0, Math.PI / 2, -Math.PI / 2, gibbous);
+      }
+
+      ctx.closePath();
+      return true;
+    }
+
+    function drawTexturedMoon(ctx, textureImg, size, r, phase, fraction) {
+      const waxing = phase <= 0.5;
+      const lightBias = waxing ? 0.68 : 0.32;
+      const terminatorRx = Math.max(r * Math.abs(1 - 2 * fraction), r * 0.01);
+
+      // Dark-side base with soft earthshine so the unlit limb stays visible.
+      drawTextureLayer(ctx, textureImg, size, 0.18, 1.08);
+      const baseShade = ctx.createRadialGradient(r * lightBias, r * 0.45, r * 0.12, r, r, r * 1.02);
+      baseShade.addColorStop(0, 'rgba(82,96,128,0.06)');
+      baseShade.addColorStop(0.55, 'rgba(12,14,20,0.20)');
+      baseShade.addColorStop(1, 'rgba(3,4,7,0.30)');
+      ctx.fillStyle = baseShade;
+      ctx.fillRect(0, 0, size, size);
+
+      if (traceLitRegion(ctx, r, fraction, waxing)) {
+        ctx.save();
+        ctx.clip();
+        drawTextureLayer(ctx, textureImg, size, 1.01, 1.18);
+        ctx.globalCompositeOperation = 'multiply';
+        drawTextureLayer(ctx, textureImg, size, 0.78, 1.52, 0.42);
+        ctx.globalCompositeOperation = 'source-over';
+        addTextureRelief(ctx, size, r);
+        drawTerminatorRelief(ctx, size, r, terminatorRx, waxing);
+
+        const litBloom = ctx.createRadialGradient(r * lightBias, r * 0.46, r * 0.06, r, r, r);
+        litBloom.addColorStop(0, 'rgba(255,250,238,0.08)');
+        litBloom.addColorStop(0.45, 'rgba(255,248,230,0.025)');
+        litBloom.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = litBloom;
+        ctx.fillRect(0, 0, size, size);
+        ctx.restore();
+      }
+    }
+
+    function drawTerminatorRelief(ctx, size, r, terminatorRx, waxing) {
+      const noise = mulberry32(113);
+      ctx.save();
+      ctx.lineCap = 'round';
+
+      for (let y = r * 0.08; y < size - r * 0.08; y += Math.max(2, r * 0.008)) {
+        const dy = (y - r) / r;
+        const span = Math.sqrt(Math.max(0, 1 - dy * dy));
+        if (!span) continue;
+
+        const baseX = r + (waxing ? 1 : -1) * terminatorRx * span;
+        const jitter = (noise() - 0.5) * r * 0.018;
+        const width = (0.5 + noise()) * r * 0.022;
+
+        ctx.strokeStyle = `rgba(8,10,16,${0.18 + noise() * 0.12})`;
+        ctx.lineWidth = Math.max(1, r * 0.006);
+        ctx.beginPath();
+        if (waxing) {
+          ctx.moveTo(baseX - width + jitter, y);
+          ctx.lineTo(baseX + jitter, y);
+        } else {
+          ctx.moveTo(baseX + jitter, y);
+          ctx.lineTo(baseX + width + jitter, y);
+        }
+        ctx.stroke();
+
+        if (noise() > 0.42) {
+          ctx.strokeStyle = `rgba(220,224,232,${0.04 + noise() * 0.05})`;
+          ctx.lineWidth = Math.max(0.5, r * 0.0025);
+          ctx.beginPath();
+          if (waxing) {
+            ctx.moveTo(baseX + jitter, y);
+            ctx.lineTo(baseX + jitter + r * 0.008, y);
+          } else {
+            ctx.moveTo(baseX + jitter - r * 0.008, y);
+            ctx.lineTo(baseX + jitter, y);
+          }
+          ctx.stroke();
+        }
+      }
+
+      ctx.restore();
+    }
+
+    function addTextureRelief(ctx, size, r) {
+      const relief = ctx.createRadialGradient(r * 0.72, r * 0.66, r * 0.08, r, r, r);
+      relief.addColorStop(0, 'rgba(255,248,232,0.08)');
+      relief.addColorStop(0.45, 'rgba(255,245,225,0.03)');
+      relief.addColorStop(1, 'rgba(12,10,14,0.08)');
+      ctx.fillStyle = relief;
+      ctx.fillRect(0, 0, size, size);
+
+      ctx.globalCompositeOperation = 'soft-light';
+      const grain = mulberry32(71);
+      for (let i = 0; i < 140; i++) {
+        const x = grain() * size;
+        const y = grain() * size;
+        const radius = grain() * r * 0.035 + r * 0.008;
+        if (Math.hypot(x - r, y - r) > r * 0.98) continue;
+        const crater = ctx.createRadialGradient(x, y, 0, x, y, radius);
+        crater.addColorStop(0, `rgba(255,252,244,${grain() * 0.04 + 0.01})`);
+        crater.addColorStop(0.65, 'rgba(0,0,0,0)');
+        crater.addColorStop(1, `rgba(32,28,24,${grain() * 0.04 + 0.01})`);
+        ctx.fillStyle = crater;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    function drawProceduralSurface(ctx, size, r) {
+      // ── Highland base with subtle warm gradient ──
+      const baseGrad = ctx.createRadialGradient(r * 0.8, r * 0.75, r * 0.05, r, r, r);
+      baseGrad.addColorStop(0, '#e2ded2');
+      baseGrad.addColorStop(0.3, '#d9d5c8');
+      baseGrad.addColorStop(0.6, '#cec9bb');
+      baseGrad.addColorStop(1, '#b5b0a2');
+      ctx.fillStyle = baseGrad;
+      ctx.fillRect(0, 0, size, size);
+
+      // ── Perlin-like noise via overlapping soft blobs for surface variation ──
+      const rng = mulberry32(17);
+      for (let i = 0; i < 200; i++) {
+        const bx = rng() * size, by = rng() * size;
+        const br = rng() * r * 0.15 + r * 0.03;
+        if (Math.hypot(bx - r, by - r) > r) continue;
+        const g = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+        const shade = rng() > 0.5 ? 'rgba(200,195,185,' : 'rgba(150,145,135,';
+        g.addColorStop(0, shade + (rng() * 0.08 + 0.02) + ')');
+        g.addColorStop(1, 'transparent');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
+      }
+
+      // ── Maria (dark basaltic plains) — carefully positioned to match real moon ──
+      const maria = [
+        // Oceanus Procellarum (large, western)
+        { x:0.28, y:0.38, rx:0.16, ry:0.22, a:0.18, rot:-0.1 },
+        { x:0.22, y:0.30, rx:0.10, ry:0.08, a:0.14, rot:0.2 },
+        // Mare Imbrium (large, NW)
+        { x:0.36, y:0.28, rx:0.13, ry:0.11, a:0.20, rot:0.1 },
+        // Mare Serenitatis
+        { x:0.55, y:0.32, rx:0.10, ry:0.09, a:0.18, rot:0 },
+        // Mare Tranquillitatis
+        { x:0.58, y:0.45, rx:0.11, ry:0.09, a:0.16, rot:0.3 },
+        // Mare Crisium (isolated, NE)
+        { x:0.68, y:0.30, rx:0.06, ry:0.05, a:0.20, rot:0 },
+        // Mare Fecunditatis
+        { x:0.62, y:0.55, rx:0.09, ry:0.07, a:0.13, rot:0.1 },
+        // Mare Nectaris
+        { x:0.58, y:0.60, rx:0.05, ry:0.04, a:0.14, rot:0 },
+        // Mare Nubium (south)
+        { x:0.38, y:0.62, rx:0.10, ry:0.08, a:0.12, rot:-0.15 },
+        // Mare Humorum
+        { x:0.28, y:0.58, rx:0.06, ry:0.05, a:0.14, rot:0 },
+        // Mare Frigoris (north strip)
+        { x:0.45, y:0.15, rx:0.18, ry:0.03, a:0.10, rot:0.05 },
+        // Sinus Medii (center)
+        { x:0.47, y:0.46, rx:0.05, ry:0.04, a:0.12, rot:0 },
+        // Mare Vaporum
+        { x:0.48, y:0.36, rx:0.05, ry:0.04, a:0.11, rot:0 },
+        // Connecting dark region between Serenitatis and Tranquillitatis
+        { x:0.55, y:0.38, rx:0.06, ry:0.04, a:0.10, rot:0.4 },
+      ];
+
+      for (const m of maria) {
+        ctx.save();
+        ctx.translate(m.x * size, m.y * size);
+        ctx.rotate(m.rot || 0);
+        ctx.scale(1, m.ry / m.rx);
+        ctx.beginPath();
+        ctx.arc(0, 0, m.rx * size, 0, Math.PI * 2);
+        ctx.restore();
+        // Multi-stop gradient for more natural mare edges
+        const g = ctx.createRadialGradient(m.x*size, m.y*size, 0, m.x*size, m.y*size, m.rx*size*1.1);
+        g.addColorStop(0, `rgba(65,60,50,${m.a})`);
+        g.addColorStop(0.4, `rgba(70,65,55,${m.a * 0.7})`);
+        g.addColorStop(0.7, `rgba(80,75,65,${m.a * 0.35})`);
+        g.addColorStop(1, 'transparent');
+        ctx.fillStyle = g;
+        ctx.fill();
+      }
+
+      // ── Major named craters with proper positions ──
+      const rng2 = mulberry32(42);
+      const majorCraters = [
+        { x:0.46, y:0.82, r:0.035 }, // Tycho
+        { x:0.38, y:0.72, r:0.028 }, // Clavius-area
+        { x:0.66, y:0.38, r:0.015 }, // Proclus
+        { x:0.32, y:0.20, r:0.020 }, // Plato
+        { x:0.48, y:0.28, r:0.012 }, // Archimedes
+        { x:0.38, y:0.34, r:0.010 }, // Aristillus area
+        { x:0.70, y:0.50, r:0.018 }, // Langrenus
+        { x:0.25, y:0.50, r:0.022 }, // Grimaldi
+        { x:0.50, y:0.70, r:0.014 }, // Fracastorius area
+        { x:0.60, y:0.20, r:0.012 }, // Endymion area
+      ];
+
+      for (const c of majorCraters) {
+        const cx = c.x * size, cy = c.y * size, cr = c.r * size;
+        if (Math.hypot(cx - r, cy - r) + cr > r * 0.95) continue;
+
+        // Outer rim highlight
+        ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(210,205,195,0.25)`;
+        ctx.lineWidth = cr * 0.12; ctx.stroke();
+
+        // Inner floor (darker)
+        const floorGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cr * 0.85);
+        floorGrad.addColorStop(0, 'rgba(90,85,75,0.12)');
+        floorGrad.addColorStop(0.6, 'rgba(80,75,65,0.08)');
+        floorGrad.addColorStop(1, 'transparent');
+        ctx.beginPath(); ctx.arc(cx, cy, cr * 0.85, 0, Math.PI * 2);
+        ctx.fillStyle = floorGrad; ctx.fill();
+
+        // Central peak (tiny bright dot)
+        if (cr > size * 0.015) {
+          ctx.beginPath(); ctx.arc(cx, cy, cr * 0.08, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(220,215,205,0.15)'; ctx.fill();
+        }
+      }
+
+      // ── Tycho ray system (bright radial streaks from Tycho crater) ──
+      const tychoX = 0.46 * size, tychoY = 0.82 * size;
+      for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2 + rng2() * 0.3;
+        const len = r * (0.3 + rng2() * 0.5);
+        const width = r * 0.008 + rng2() * r * 0.006;
+        ctx.save();
+        ctx.translate(tychoX, tychoY);
+        ctx.rotate(angle);
+        const rayGrad = ctx.createLinearGradient(0, 0, len, 0);
+        rayGrad.addColorStop(0, 'rgba(220,216,205,0.12)');
+        rayGrad.addColorStop(0.3, 'rgba(220,216,205,0.06)');
+        rayGrad.addColorStop(1, 'transparent');
+        ctx.fillStyle = rayGrad;
+        ctx.fillRect(0, -width/2, len, width);
+        ctx.restore();
+      }
+
+      // ── Copernicus ray system ──
+      const copX = 0.38 * size, copY = 0.44 * size;
+      ctx.beginPath(); ctx.arc(copX, copY, r * 0.018, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(210,205,195,0.2)'; ctx.lineWidth = 2; ctx.stroke();
+      for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2 + rng2() * 0.4;
+        const len = r * (0.15 + rng2() * 0.2);
+        const width = r * 0.005 + rng2() * r * 0.004;
+        ctx.save();
+        ctx.translate(copX, copY);
+        ctx.rotate(angle);
+        const rayGrad = ctx.createLinearGradient(0, 0, len, 0);
+        rayGrad.addColorStop(0, 'rgba(215,210,200,0.08)');
+        rayGrad.addColorStop(1, 'transparent');
+        ctx.fillStyle = rayGrad;
+        ctx.fillRect(0, -width/2, len, width);
+        ctx.restore();
+      }
+
+      // ── Smaller random craters (many layers for density) ──
+      const rng3 = mulberry32(99);
+      for (let i = 0; i < 250; i++) {
+        const cx = rng3() * size, cy = rng3() * size;
+        const cr = rng3() * r * 0.025 + r * 0.003;
+        if (Math.hypot(cx - r, cy - r) + cr > r * 0.95) continue;
+
+        // Rim
+        ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(195,190,180,${rng3() * 0.10 + 0.03})`;
+        ctx.lineWidth = Math.max(0.5, cr * 0.1); ctx.stroke();
+
+        // Floor
+        ctx.beginPath(); ctx.arc(cx, cy, cr * 0.7, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(60,55,48,${rng3() * 0.06 + 0.015})`; ctx.fill();
+      }
+
+      // ── Tiny craterlets for texture ──
+      for (let i = 0; i < 500; i++) {
+        const cx = rng3() * size, cy = rng3() * size;
+        if (Math.hypot(cx - r, cy - r) > r * 0.95) continue;
+        const cr = rng3() * 2.5 + 0.5;
+        ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+        ctx.fillStyle = rng3() > 0.5
+          ? `rgba(220,215,205,${rng3() * 0.06 + 0.01})`
+          : `rgba(50,45,38,${rng3() * 0.06 + 0.01})`;
+        ctx.fill();
+      }
+
+      // ── Highland bright patches (southern highlands are brighter) ──
+      for (let i = 0; i < 30; i++) {
+        const px = (0.3 + rng3() * 0.4) * size;
+        const py = (0.65 + rng3() * 0.3) * size;
+        const pr = rng3() * r * 0.08 + r * 0.02;
+        if (Math.hypot(px - r, py - r) > r) continue;
+        const hg = ctx.createRadialGradient(px, py, 0, px, py, pr);
+        hg.addColorStop(0, `rgba(215,210,200,${rng3() * 0.06 + 0.02})`);
+        hg.addColorStop(1, 'transparent');
+        ctx.beginPath(); ctx.arc(px, py, pr, 0, Math.PI * 2);
+        ctx.fillStyle = hg; ctx.fill();
+      }
+    }
+
+    function applyPhaseShadow(ctx, size, r, phase) {
+      const waxing = phase <= 0.5;
+      const biasX = waxing ? r * 1.26 : r * 0.74;
+      const rimGlow = ctx.createRadialGradient(biasX, r * 0.5, r * 0.06, r, r, r * 1.02);
+      rimGlow.addColorStop(0, 'rgba(255,248,230,0.035)');
+      rimGlow.addColorStop(0.4, 'rgba(255,244,218,0.012)');
+      rimGlow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = rimGlow;
+      ctx.fillRect(0, 0, size, size);
+    }
+
+    function mulberry32(a) {
+      return function() {
+        a |= 0; a = a + 0x6D2B79F5 | 0;
+        var t = Math.imul(a ^ a >>> 15, 1 | a);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      };
+    }
+
+    // ────────────────────── Page-wide glow ──────────────────────
+    function setPageGlow(phase, fraction) {
+      const glow = document.getElementById('pageGlow');
+      const halo = document.getElementById('moonHalo');
+
+      const intensity = Math.max(0.2, Math.pow(fraction, 0.66) * 0.56);
+      const waxing = phase <= 0.5;
+      const glowX = waxing
+        ? 60 + fraction * 4
+        : 40 - fraction * 4;
+      glow.style.background = `
+        radial-gradient(ellipse 96% 74% at ${glowX}% 32%,
+          rgba(220,228,250,${intensity}) 0%,
+          rgba(178,190,230,${intensity * 0.74}) 18%,
+          rgba(110,126,182,${intensity * 0.38}) 40%,
+          rgba(54,68,110,${intensity * 0.18}) 64%,
+          transparent 88%
+        ),
+        radial-gradient(ellipse 180% 145% at 50% 46%,
+          rgba(72,84,132,${intensity * 0.24}) 0%,
+          rgba(30,36,62,${intensity * 0.16}) 44%,
+          rgba(12,14,26,${intensity * 0.08}) 70%,
+          transparent 100%
+        ),
+        linear-gradient(
+          180deg,
+          rgba(34,42,74,${intensity * 0.1}) 0%,
+          rgba(8,10,18,0) 55%
+        ),
+        linear-gradient(
+          0deg,
+          rgba(22,28,52,${intensity * 0.08}) 0%,
+          transparent 100%
+        )`;
+      glow.style.opacity = '1';
+
+      halo.style.background = 'none';
+      halo.style.opacity = '0';
+    }
+
+    // ────────────────────── Phase helpers ──────────────────────
+    const PHASE_NAMES = [
+      { max: 0.0625, name: 'New Moon', icon: '\uD83C\uDF11' },
+      { max: 0.1875, name: 'Waxing Crescent', icon: '\uD83C\uDF12' },
+      { max: 0.3125, name: 'First Quarter', icon: '\uD83C\uDF13' },
+      { max: 0.4375, name: 'Waxing Gibbous', icon: '\uD83C\uDF14' },
+      { max: 0.5625, name: 'Full Moon', icon: '\uD83C\uDF15' },
+      { max: 0.6875, name: 'Waning Gibbous', icon: '\uD83C\uDF16' },
+      { max: 0.8125, name: 'Last Quarter', icon: '\uD83C\uDF17' },
+      { max: 0.9375, name: 'Waning Crescent', icon: '\uD83C\uDF18' },
+      { max: 1.0, name: 'New Moon', icon: '\uD83C\uDF11' },
+    ];
+
+    function getPhaseInfo(p) {
+      for (const e of PHASE_NAMES) { if (p < e.max) return e; }
+      return PHASE_NAMES[0];
+    }
+
+    function formatTime(d, timeZone) {
+      if (!d || isNaN(d.getTime())) return '--';
+      return new Intl.DateTimeFormat([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: timeZone || undefined,
+      }).format(d);
+    }
+
+    function formatNumericTime(d, timeZone) {
+      if (!d || isNaN(d.getTime())) return '--';
+      return new Intl.DateTimeFormat([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+        timeZone: timeZone || undefined,
+      }).format(d);
+    }
+
+    function getTimeZoneDateParts(date, timeZone) {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: timeZone || undefined,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(date).reduce((acc, part) => {
+        if (part.type !== 'literal') acc[part.type] = part.value;
+        return acc;
+      }, {});
+    }
+
+    function getTimeZoneDateTimeParts(date, timeZone) {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: timeZone || undefined,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23',
+      }).formatToParts(date).reduce((acc, part) => {
+        if (part.type !== 'literal') acc[part.type] = part.value;
+        return acc;
+      }, {});
+    }
+
+    function getTimeZoneOffsetMs(date, timeZone) {
+      const parts = getTimeZoneDateTimeParts(date, timeZone);
+      const asUtc = Date.UTC(
+        Number(parts.year),
+        Number(parts.month) - 1,
+        Number(parts.day),
+        Number(parts.hour),
+        Number(parts.minute),
+        Number(parts.second)
+      );
+      return asUtc - date.getTime();
+    }
+
+    function makeTimeZoneDate(timeZone, year, month, day, hour = 12, minute = 0, second = 0) {
+      const utcGuess = Date.UTC(year, month - 1, day, hour, minute, second);
+      const guessDate = new Date(utcGuess);
+      const offset = getTimeZoneOffsetMs(guessDate, timeZone);
+      return new Date(utcGuess - offset);
+    }
+
+    function shiftTimeZoneDate(date, timeZone, days) {
+      const parts = getTimeZoneDateParts(date, timeZone);
+      const shifted = new Date(Date.UTC(
+        Number(parts.year),
+        Number(parts.month) - 1,
+        Number(parts.day) + days,
+        12,
+        0,
+        0
+      ));
+      return makeTimeZoneDate(
+        timeZone,
+        shifted.getUTCFullYear(),
+        shifted.getUTCMonth() + 1,
+        shifted.getUTCDate(),
+        12,
+        0,
+        0
+      );
+    }
+
+    function isSameTimeZoneDay(a, b, timeZone) {
+      const pa = getTimeZoneDateParts(a, timeZone);
+      const pb = getTimeZoneDateParts(b, timeZone);
+      return pa.year === pb.year && pa.month === pb.month && pa.day === pb.day;
+    }
+
+    function formatShortDate(date, timeZone) {
+      return new Intl.DateTimeFormat([], {
+        month: 'short',
+        day: 'numeric',
+        timeZone: timeZone || undefined,
+      }).format(date);
+    }
+
+    function formatWeekday(date, timeZone) {
+      return new Intl.DateTimeFormat([], {
+        weekday: 'short',
+        timeZone: timeZone || undefined,
+      }).format(date);
+    }
+
+    function findMoonEvent(date, lat, lng, eventName, timeZone) {
+      for (let offset = 0; offset <= 3; offset++) {
+        const targetDay = shiftTimeZoneDate(date, timeZone, offset);
+        const times = SunCalc.getMoonTimes(targetDay, lat, lng);
+        if (times[eventName] && !isNaN(times[eventName].getTime())) {
+          return { time: times[eventName], offsetDays: offset };
+        }
+      }
+
+      for (let offset = -1; offset >= -2; offset--) {
+        const targetDay = shiftTimeZoneDate(date, timeZone, offset);
+        const times = SunCalc.getMoonTimes(targetDay, lat, lng);
+        if (times[eventName] && !isNaN(times[eventName].getTime())) {
+          return { time: times[eventName], offsetDays: offset };
+        }
+      }
+
+      return null;
+    }
+
+    function formatMoonEvent(eventInfo) {
+      if (!eventInfo) return '--';
+      const time = formatTime(eventInfo.time, eventInfo.timeZone);
+      if (!eventInfo.referenceDate || isSameTimeZoneDay(eventInfo.time, eventInfo.referenceDate, eventInfo.timeZone)) {
+        return time;
+      }
+      return `${formatShortDate(eventInfo.time, eventInfo.timeZone)} ${time}`;
+    }
+
+    // ────────────────────── Upcoming phases ──────────────────────
+    function findUpcomingPhases(now) {
+      const targets = [
+        { name: 'New Moon', target: 0, icon: '\uD83C\uDF11' },
+        { name: 'First Quarter', target: 0.25, icon: '\uD83C\uDF13' },
+        { name: 'Full Moon', target: 0.5, icon: '\uD83C\uDF15' },
+        { name: 'Last Quarter', target: 0.75, icon: '\uD83C\uDF17' },
+      ];
+      const results = [];
+      for (const t of targets) {
+        for (let d = 0; d < 35; d++) {
+          const d1 = new Date(now.getTime() + d * 864e5);
+          const d2 = new Date(now.getTime() + (d+1) * 864e5);
+          const p1 = SunCalc.getMoonIllumination(d1).phase;
+          const p2 = SunCalc.getMoonIllumination(d2).phase;
+          const crossed = t.target === 0 ? p2 < p1 : (p1 <= t.target && p2 > t.target);
+          if (crossed) {
+            let lo = d1.getTime(), hi = d2.getTime();
+            for (let i = 0; i < 16; i++) {
+              const mid = (lo + hi) / 2;
+              const pm = SunCalc.getMoonIllumination(new Date(mid)).phase;
+              if (t.target === 0) { pm > 0.5 ? lo = mid : hi = mid; }
+              else { pm < t.target ? lo = mid : hi = mid; }
+            }
+            const found = new Date((lo + hi) / 2);
+            results.push({ ...t, date: found, daysAway: Math.ceil((found - now) / 864e5) });
+            break;
+          }
+        }
+      }
+      return results.sort((a, b) => a.date - b.date);
+    }
+
+    function renderUpcoming(phases, timeZone) {
+      document.getElementById('phasesGrid').innerHTML = phases.map(p => {
+        const ds = formatShortDate(p.date, timeZone);
+        const dl = p.daysAway === 0 ? 'Today' : p.daysAway === 1 ? 'Tomorrow' : `in ${p.daysAway} days`;
+        return `<div class="phase-card">
+          <span class="phase-icon">${p.icon}</span>
+          <span class="phase-card-name">${p.name}</span>
+          <span class="phase-card-date">${ds}</span>
+          <span class="phase-card-days">${dl}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function renderDayStrip(now, timeZone) {
+      document.getElementById('dayStrip').innerHTML = Array.from({length: 7}, (_, i) => {
+        const d = i - 3;
+        const date = shiftTimeZoneDate(now, timeZone, d);
+        const ph = SunCalc.getMoonIllumination(date).phase;
+        const icon = getPhaseInfo(ph).icon;
+        const label = d === 0 ? 'Today' : formatWeekday(date, timeZone);
+        return `<div class="day ${d === 0 ? 'today' : ''}">
+          <span class="day-icon">${icon}</span>
+          <span class="day-label">${label}</span>
+        </div>`;
+      }).join('');
+    }
+
+    // ────────────────────── Geolocation ──────────────────────
+    async function getLocation() {
+      // Try multiple CORS-friendly IP geolocation APIs in order.
+      const apis = [
+        {
+          url: 'https://get.geojs.io/v1/ip/geo.json',
+          parse: d => ({ lat: +d.latitude, lng: +d.longitude, city: d.city, region: d.region, country: d.country, timeZone: d.timezone })
+        },
+        {
+          url: 'https://ipapi.co/json/',
+          parse: d => ({ lat: d.latitude, lng: d.longitude, city: d.city, region: d.region, country: d.country_name, timeZone: d.timezone })
+        },
+      ];
+
+      for (const api of apis) {
+        try {
+          const r = await fetch(api.url, { mode: 'cors', cache: 'no-store' });
+          if (!r.ok) continue;
+          const d = await r.json();
+          const loc = api.parse(d);
+          if (loc.lat && loc.lng) return loc;
+        } catch { /* try next */ }
+      }
+      return { lat: 0, lng: 0, city: null, region: null, country: null };
+    }
+
+    // ────────────────────── Init ──────────────────────
+    async function init() {
+      const [loc, textureImg] = await Promise.all([getLocation(), loadMoonTexture()]);
+      const timeZone = loc.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      // Location
+      const locEl = document.getElementById('location');
+      if (loc.city) {
+        locEl.innerHTML = `${loc.city}, ${loc.region}<br>${loc.country}`;
+      }
+
+      const now = new Date();
+      const illum = SunCalc.getMoonIllumination(now);
+      const moonrise = findMoonEvent(now, loc.lat, loc.lng, 'rise', timeZone);
+      const moonset = findMoonEvent(now, loc.lat, loc.lng, 'set', timeZone);
+      if (moonrise) Object.assign(moonrise, { timeZone, referenceDate: now });
+      if (moonset) Object.assign(moonset, { timeZone, referenceDate: now });
+
+      // Draw moon
+      const canvas = document.getElementById('moonCanvas');
+      drawMoon(canvas, illum.phase, illum.fraction, textureImg);
+
+      // Glow
+      setPageGlow(illum.phase, illum.fraction);
+
+      // Text
+      document.getElementById('phaseName').textContent = getPhaseInfo(illum.phase).name;
+      document.getElementById('illumination').textContent = Math.round(illum.fraction * 100) + '%';
+      document.getElementById('moonrise').textContent = formatMoonEvent(moonrise);
+      document.getElementById('moonset').textContent = moonset ? formatNumericTime(moonset.time, moonset.timeZone) : '--';
+
+      renderDayStrip(now, timeZone);
+      renderUpcoming(findUpcomingPhases(now), timeZone);
+    }
+
+    init();
+  </script>
+</body>
+</html>
